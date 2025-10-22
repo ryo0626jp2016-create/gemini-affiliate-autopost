@@ -1,0 +1,1 @@
+A8手動URL対応版。data/offers_manual.csv に手動のA8 URLを入れると使われます。
