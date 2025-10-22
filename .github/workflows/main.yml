@@ -1,0 +1,37 @@
+name: publish
+
+on:
+  schedule:
+    # UTC 00,03,06,09,12 → JST 09,12,15,18,21
+    - cron: "0 0,3,6,9,12 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  autopost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run scheduler
+        env:
+          WP_BASE_URL2: ${{ secrets.WP_BASE_URL2 }}
+          WP_USER: ${{ secrets.WP_USER }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          A8_APP_ID: ${{ secrets.A8_APP_ID }}
+          MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
+          VALUECOMMERCE_SID: ${{ secrets.VALUECOMMERCE_SID }}
+          VALUECOMMERCE_PID: ${{ secrets.VALUECOMMERCE_PID }}
+        run: |
+          python -m scripts scheduler
