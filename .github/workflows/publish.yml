@@ -36,7 +36,7 @@ jobs:
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL != '' && secrets.GEMINI_MODEL || 'gemini-1.5-pro' }}
           A8_APP_ID: ${{ secrets.A8_APP_ID }}
           MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
           VALUECOMMERCE_SID: ${{ secrets.VALUECOMMERCE_SID }}
