@@ -1,26 +1,33 @@
+# scripts/config.py ーーー完全版
 import os
 from dataclasses import dataclass
 
 @dataclass
-class Config:
-    # WordPress 投稿設定
-    wp_base_url: str = os.getenv("WP_BASE_URL2")
-    wp_user: str = os.getenv("WP_USER")
-    wp_app_password: str = os.getenv("WP_APP_PASSWORD")
+class Settings:
+    # WordPress
+    wp_base_url2: str = (os.getenv("WP_BASE_URL2") or "").rstrip("/")
+    wp_user: str = os.getenv("WP_USER") or ""
+    wp_app_password: str = os.getenv("WP_APP_PASSWORD") or ""
 
-    # Gemini API設定
-    gemini_api_key: str = os.getenv("GEMINI_API_KEY")
-    
-    # モデル名の正規化処理（models/が付いていても安全に動作）
-    _raw_model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-pro").strip()
-    if _raw_model.startswith("models/"):
-        _raw_model = _raw_model.split("/", 1)[1]
-    gemini_model: str = _raw_model
+    # Gemini
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY") or ""
+    # モデル名の正規化（空/全角/先頭に 'models/' が付いてもOKに）
+    _raw = (os.getenv("GEMINI_MODEL") or "gemini-1.5-pro").strip()
+    if _raw.startswith("models/"):
+        _raw = _raw.split("/", 1)[1]
+    gemini_model: str = _raw
 
-    # ASP系APIキー
-    a8_app_id: str = os.getenv("A8_APP_ID")
-    moshimo_affiliate_id: str = os.getenv("MOSHIMO_AFFILIATE_ID")
-    valuecommerce_sid: str = os.getenv("VALUECOMMERCE_SID")
-    valuecommerce_pid: str = os.getenv("VALUECOMMERCE_PID")
+    # ASP（任意）
+    a8_app_id: str = os.getenv("A8_APP_ID") or ""
+    moshimo_affiliate_id: str = os.getenv("MOSHIMO_AFFILIATE_ID") or ""
+    valuecommerce_sid: str = os.getenv("VALUECOMMERCE_SID") or ""
+    valuecommerce_pid: str = os.getenv("VALUECOMMERCE_PID") or ""
 
-config = Config()
+    def validate(self, strict: bool = False):
+        missing = []
+        if not self.wp_base_url2:      missing.append("WP_BASE_URL2")
+        if not self.wp_user:           missing.append("WP_USER")
+        if not self.wp_app_password:   missing.append("WP_APP_PASSWORD")
+        if not self.gemini_api_key:    missing.append("GEMINI_API_KEY")
+        if strict and missing:
+            raise RuntimeError("Missing env: " + ", ".join(missing))
