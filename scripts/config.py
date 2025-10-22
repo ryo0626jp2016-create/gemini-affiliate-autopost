@@ -8,7 +8,7 @@ class Settings:
     wp_user=os.getenv('WP_USER','')
     wp_app_password=os.getenv('WP_APP_PASSWORD','')
     gemini_api_key=os.getenv('GEMINI_API_KEY','')
-    gemini_model=os.getenv('GEMINI_MODEL','gemini-1.5-pro')
+    gemini_model: str = os.getenv("GEMINI_MODEL") or "gemini-1.5-pro"
     def validate(self,strict=False):
         missing=[]
         if not self.wp_base_url2: missing.append('WP_BASE_URL2')
