@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Any, List
+from typing import Dict, List
 from pathlib import Path
 import csv, hashlib
 
@@ -24,7 +24,5 @@ def build_offers(keyword: str) -> List[Dict[str, str]]:
     if not offers:
         return [{"name":"サンプルA8","url":"https://example.com","note":"サンプル"}]
     h = int(hashlib.sha256(keyword.encode("utf-8")).hexdigest(), 16)
-    n = len(offers)
-    k = h % n
-    rotated = offers[k:] + offers[:k]
-    return rotated[:3]
+    k = h % len(offers)
+    return (offers[k:] + offers[:k])[:3]
