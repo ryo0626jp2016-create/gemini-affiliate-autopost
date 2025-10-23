@@ -2,7 +2,7 @@ name: publish
 
 on:
   schedule:
-    - cron: "0 0,3,6,9,12 * * *"   # UTC
+    - cron: "0 0,3,6,9,12 * * *"   # UTC なので JST 09/12/15/18/21 に相当
   workflow_dispatch: {}
 
 jobs:
@@ -17,8 +17,6 @@ jobs:
           echo "PWD=$(pwd)"
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
           ls -la
-          echo "---- tree (top-level) ----"
-          ls -la $GITHUB_WORKSPACE
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,13 +28,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r "$GITHUB_WORKSPACE/requirements.txt"
 
+      # 任意：Gemini疎通チェック（モデル名の確認）
+      - name: Gemini sanity check
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+        run: |
+          python - <<'PY'
+          import os, google.generativeai as genai
+          model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-pro").strip()
+          if model.startswith("models/"):
+              model = model.split("/",1)[1]
+          print("[check] model =", model)
+          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+          resp = genai.GenerativeModel(model).generate_content("ping")
+          print("[check] ok, got chars:", len(resp.text or ""))
+          PY
+
       - name: Run scheduler
         env:
           WP_BASE_URL2: ${{ secrets.WP_BASE_URL2 }}
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL != '' && secrets.GEMINI_MODEL || 'gemini-1.5-pro' }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
           A8_APP_ID: ${{ secrets.A8_APP_ID }}
           MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
           VALUECOMMERCE_SID: ${{ secrets.VALUECOMMERCE_SID }}
