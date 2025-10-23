@@ -1,1 +1,14 @@
-<article><h1>{{ title }}</h1>{{ lede }}{% for b in sections %}<h2>{{ b.h2 }}</h2>{{ b.html|safe }}{% endfor %}<ul>{% for o in offers %}<li><a href='{{ o.url }}' rel='sponsored'>{{ o.name }}</a> {{ o.note }}</li>{% endfor %}</ul></article>
+<article>
+  <h1>{{ title }}</h1>
+  {{ lede }}
+  {% for b in sections %}
+    <h2>{{ b.h2 }}</h2>
+    {{ b.html|safe }}
+  {% endfor %}
+  <h2>おすすめ案件</h2>
+  <ul>
+    {% for o in offers %}
+      <li><a href="{{ o.url }}" rel="sponsored nofollow">{{ o.name }}</a> {{ o.note }}</li>
+    {% endfor %}
+  </ul>
+</article>
