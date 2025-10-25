@@ -2,7 +2,7 @@ name: publish
 
 on:
   schedule:
-    - cron: "0 0,3,6,9,12 * * *"   # UTC なので JST 09/12/15/18/21 に相当
+    - cron: "0 0,3,6,9,12 * * *"  # UTC なので JST 09/12/15/18/21 に相当
   workflow_dispatch: {}
 
 jobs:
@@ -36,7 +36,8 @@ jobs:
         run: |
           python - <<'PY'
           import os, google.generativeai as genai
-          model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-pro").strip()
+          # モデル名のデフォルト値を 'gemini-1.5-flash' に修正
+          model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-flash").strip()
           if model.startswith("models/"):
               model = model.split("/",1)[1]
           print("[check] model =", model)
