@@ -2,7 +2,7 @@ name: publish
 
 on:
   schedule:
-    # UTCで 0,3,6,9,12時 → JSTで 9,12,15,18,21
+    # UTC 0,3,6,9,12 → JST 9,12,15,18,21
     - cron: "0 0,3,6,9,12 * * *"
   workflow_dispatch: {}
 
@@ -30,12 +30,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r "$GITHUB_WORKSPACE/requirements.txt"
 
-      # ここが今回のエラー原因だったので修正
+      # ここが今まで落ちてたところ。固定モデル名をやめて、そのAPIキーで実際に使えるモデルを拾う。
       - name: Gemini sanity check
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # あれば secrets 側を優先、なければ動作確認しやすい名前に
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}  # あればこれを優先
         run: |
           python - <<'PY'
           import os
@@ -43,19 +42,35 @@ jobs:
 
           api_key = os.getenv("GEMINI_API_KEY")
           if not api_key:
-              raise SystemExit("GEMINI_API_KEY が設定されていません。GitHub Secrets に入れてください。")
+            raise SystemExit("GEMINI_API_KEY が設定されていません。GitHub Secrets に入れてください。")
 
-          # secretsにあればそれ、なければこのモデルにする
-          model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-flash-001").strip()
-
-          # ここで設定
           genai.configure(api_key=api_key)
 
-          print("[check] model =", model)
-          model_obj = genai.GenerativeModel(model)
+          # まず利用可能なモデルを一覧する
+          models = list(genai.list_models())
+          # generateContent ができるものだけに絞る
+          content_models = [
+              m.name for m in models
+              if "generateContent" in getattr(m, "supported_generation_methods", [])
+          ]
 
-          # ごく短いプロンプトで確認
-          resp = model_obj.generate_content("health blog article")
+          # secrets で明示されてる → それを使う
+          env_model = os.getenv("GEMINI_MODEL")
+          if env_model:
+            model_name = env_model.strip()
+          else:
+            if not content_models:
+              raise SystemExit("このAPIキーで generateContent できるモデルが見つかりませんでした。")
+            # 一番最初のを使う（例: models/gemini-2.5-flash みたいなのが来るはず）
+            model_name = content_models[0]
+
+          print("[check] model =", model_name)
+
+          # list_models() は "models/..." で返すので、末尾だけにしておく
+          short_name = model_name.split("/")[-1]
+
+          model = genai.GenerativeModel(short_name)
+          resp = model.generate_content("ping")
           text = getattr(resp, "text", "") or ""
           print("[check] ok, got chars:", len(text))
           PY
@@ -66,12 +81,13 @@ jobs:
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}  # ここもsecretに合わせておく
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
           A8_APP_ID: ${{ secrets.A8_APP_ID }}
           MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
           VALUECOMMERCE_SID: ${{ secrets.VALUECOMMERCE_SID }}
           VALUECOMMERCE_PID: ${{ secrets.VALUECOMMERCE_PID }}
         run: |
-          # ここが元のコードだとおそらく動かないので普通の実行にする
-          # プロジェクト構成が /scripts/scheduler.py の想定
+          # scripts/scheduler.py があるのはさっきの ls で確認できてるのでこれでOK
           python scripts/scheduler.py
+
+
