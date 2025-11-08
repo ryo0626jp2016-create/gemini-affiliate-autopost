@@ -1,3 +1,2 @@
-from .scheduler import main
-if __name__ == '__main__':
-    main()
+# scripts/__init__.py
+# make this directory a package
