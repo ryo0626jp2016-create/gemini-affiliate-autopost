@@ -87,7 +87,9 @@ jobs:
           VALUECOMMERCE_SID: ${{ secrets.VALUECOMMERCE_SID }}
           VALUECOMMERCE_PID: ${{ secrets.VALUECOMMERCE_PID }}
         run: |
-          # scripts/scheduler.py があるのはさっきの ls で確認できてるのでこれでOK
-          python scripts/scheduler.py
+          # scripts をパッケージとして認識させるために空の __init__.py を置く
+          touch scripts/__init__.py
+          # パッケージとして実行する（相対importが動くようになる）
+          python -m scripts.scheduler
 
 
