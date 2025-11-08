@@ -1,52 +1,45 @@
 # scripts/scheduler.py
+from __future__ import annotations
+
 from .config import Settings
 from . import content_plan, gemini_client, render_post, wordpress_client
 from .fetch_offers import build_offers
 
-def run(dry_run: bool | None = None):
-    # 設定を読み込む
+
+def run(dry_run: bool = False) -> None:
     cfg = Settings()
-
-    # 引数でdry_runが指定されてなければ、環境変数のほうを使う
-    if dry_run is None:
-        dry_run = cfg.dry_run
-
-    # 本番のときだけ必須チェックを厳しくする
+    # 本番なら環境変数チェック
     cfg.validate(strict=not dry_run)
 
-    # 1) キーワード・見出しなどのプランを決める
-    #    元のコードが plan = content_plan.pick_topic() だったのでそのまま踏襲
+    # 1. 記事の題材を決める（content_plan.py 側でCSVから選ぶ想定）
     plan = content_plan.pick_topic()
+    # 例：plan = {"keyword": "光回線", "lede": "今回は～", "headings": [...]}
 
-    # 例: 「光回線の選び方と比較」みたいなタイトルを作る
     title = f"{plan['keyword']}の選び方と比較"
 
-    # 2) Geminiで本文パートを生成
-    #    gemini_client 側で cfg.gemini_api_key / cfg.gemini_model を読む想定
+    # 2. Geminiで本文を作る
     sections = gemini_client.generate_article(plan, plan["headings"])
 
-    # 3) 紹介する案件をCSVなどから組み立てる
+    # 3. A8のオファーをキーワードから取得
     offers = build_offers(plan["keyword"])
 
-    # 4) HTMLとして組み立て（ここで WP のURL を渡してる元コードに合わせてる）
+    # 4. HTMLにまとめる
     html = render_post.render_article(
         title,
         plan["lede"],
         plan["headings"],
         sections,
         offers,
-        cfg.wp_base_url,
+        cfg.wp_base_url2,
     )
 
-    # 5) 実投稿 or ドライラン表示
     if dry_run:
-        print("[DRY_RUN] title:", title)
-        print("[DRY_RUN] post to:", cfg.wp_base_url)
-        print("[DRY_RUN] offers:", offers)
-        print("[DRY_RUN] html preview:\n", html[:500])
+        print(title)
+        print("---- HTML preview ----")
+        print(html[:800])
         return
 
-    # 実際にWordPressにPOSTする
+    # 5. WPに投稿
     res = wordpress_client.create_post(title, html, status="publish")
     print("Published:", res.get("link", ""))
 
@@ -55,7 +48,7 @@ def main():
     import argparse
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("scheduler", nargs="?", help="for compatibility")
+    ap.add_argument("scheduler", nargs="?")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
