@@ -2,12 +2,14 @@ name: publish
 
 on:
   schedule:
-    - cron: "0 0,3,6,9,12 * * *"  # UTC なので JST 09/12/15/18/21 に相当
+    # UTCで 0,3,6,9,12時 → JSTで 9,12,15,18,21
+    - cron: "0 0,3,6,9,12 * * *"
   workflow_dispatch: {}
 
 jobs:
   autopost:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,7 +18,7 @@ jobs:
         run: |
           echo "PWD=$(pwd)"
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          ls -la
+          ls -R .
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,22 +30,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r "$GITHUB_WORKSPACE/requirements.txt"
 
-      # 任意：Gemini疎通チェック（モデル名の確認）
+      # ここが今回のエラー原因だったので修正
       - name: Gemini sanity check
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # あれば secrets 側を優先、なければ動作確認しやすい名前に
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
         run: |
           python - <<'PY'
-          import os, google.generativeai as genai
-          # モデル名のデフォルト値を 'gemini-1.5-flash' に修正
-          model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-flash").strip()
-          if model.startswith("models/"):
-              model = model.split("/",1)[1]
+          import os
+          import google.generativeai as genai
+
+          api_key = os.getenv("GEMINI_API_KEY")
+          if not api_key:
+              raise SystemExit("GEMINI_API_KEY が設定されていません。GitHub Secrets に入れてください。")
+
+          # secretsにあればそれ、なければこのモデルにする
+          model = (os.getenv("GEMINI_MODEL") or "gemini-1.5-flash-001").strip()
+
+          # ここで設定
+          genai.configure(api_key=api_key)
+
           print("[check] model =", model)
-          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-          resp = genai.GenerativeModel(model).generate_content("ping")
-          print("[check] ok, got chars:", len(resp.text or ""))
+          model_obj = genai.GenerativeModel(model)
+
+          # ごく短いプロンプトで確認
+          resp = model_obj.generate_content("health blog article")
+          text = getattr(resp, "text", "") or ""
+          print("[check] ok, got chars:", len(text))
           PY
 
       - name: Run scheduler
@@ -52,10 +66,12 @@ jobs:
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-1.5-flash
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}  # ここもsecretに合わせておく
           A8_APP_ID: ${{ secrets.A8_APP_ID }}
           MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
           VALUECOMMERCE_SID: ${{ secrets.VALUECOMMERCE_SID }}
           VALUECOMMERCE_PID: ${{ secrets.VALUECOMMERCE_PID }}
         run: |
-          python -m scripts scheduler
+          # ここが元のコードだとおそらく動かないので普通の実行にする
+          # プロジェクト構成が /scripts/scheduler.py の想定
+          python scripts/scheduler.py
