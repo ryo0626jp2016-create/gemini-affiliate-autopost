@@ -1,74 +1,42 @@
-# scripts/fetch_offers.py
 from __future__ import annotations
 from typing import Dict, List
 from pathlib import Path
-import csv
-import hashlib
-import os
+import csv, hashlib, urllib.parse, random
 
-# data/offers_manual.csv を読む前提
+# === あなた専用A8トラッキングID ===
+A8MAT = "45G7HH+AV5T82+3HZU+15ORS2"
+A8_BASE = "https://px.a8.net/svt/ejp"
+
 DATA = Path(__file__).resolve().parents[1] / "data" / "offers_manual.csv"
 
-
-def _load_offers(a8_app_id: str | None = None) -> List[Dict[str, str]]:
-    """CSVを読み込んで、必要ならA8リンクに変換して返す"""
+def _load_offers() -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
-
-    if not DATA.exists():
-        print(f"[warn] {DATA} が見つかりません")
-        return rows
-
-    with DATA.open(newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            raw_url = (row.get("url") or "").strip()
-            if not raw_url:
-                continue
-
-            name = (row.get("name") or "A8オファー").strip()
-            note = (row.get("note") or "").strip()
-
-            # A8_APP_ID があれば px.a8.net の形式にする
-            if a8_app_id:
-                # a8ejpredirect= には元のLPをそのまま
-                offer_url = (
-                    f"https://px.a8.net/svt/ejp?a8mat={a8_app_id}"
-                    f"&a8ejpredirect={raw_url}"
-                )
-            else:
-                # 無ければそのまま直リンク
-                print(f"[warn] A8_APP_ID 未設定 → {name} は直リンクで出力します")
-                offer_url = raw_url
-
-            rows.append(
-                {
-                    "name": name,
-                    "url": offer_url,
-                    "note": note,
-                }
-            )
-
+    if DATA.exists():
+        with open(DATA, newline="", encoding="utf-8") as f:
+            r = csv.DictReader(f)
+            for row in r:
+                if row.get("url"):
+                    # URLをA8トラッキング付きに変換
+                    target = row["url"].strip()
+                    encoded = urllib.parse.quote(target, safe="")
+                    a8_url = f"{A8_BASE}?a8mat={A8MAT}&a8ejpredirect={encoded}"
+                    rows.append({
+                        "name": row.get("name","おすすめ商品"),
+                        "url": a8_url,
+                        "note": row.get("note","その他")
+                    })
     return rows
 
-
 def build_offers(keyword: str) -> List[Dict[str, str]]:
-    """
-    記事ごとに3件くらい出したいので、
-    キーワードのハッシュでずらして3つ返す
-    """
-    a8_app_id = os.getenv("A8_APP_ID")
-    offers = _load_offers(a8_app_id)
-
+    """記事のキーワードに関連しそうなA8オファーを3件抽出"""
+    offers = _load_offers()
     if not offers:
-        return [
-            {
-                "name": "サンプルA8",
-                "url": "https://example.com",
-                "note": "サンプル",
-            }
-        ]
+        return [{"name": "サンプルA8リンク", "url": "https://example.com", "note": "サンプル"}]
 
-    h = int(hashlib.sha256(keyword.encode("utf-8")).hexdigest(), 16)
-    start = h % len(offers)
-    rotated = offers[start:] + offers[:start]
-    return rotated[:3]
+    # キーワードに近いカテゴリを優先抽出
+    related = [o for o in offers if o["note"] in keyword or keyword in o["note"]]
+    pool = related if related else offers
+
+    random.shuffle(pool)
+    return pool[:3]
+
