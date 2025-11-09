@@ -1,36 +1,68 @@
+# scripts/render_post.py
+
 from __future__ import annotations
 from typing import List, Dict
-from jinja2 import Template
-from pathlib import Path
+import html
 
-TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "post_template.html"
 
-def render_article(title: str, lede: str, headings: List[str], sections: List[str],
-                   offers: List[Dict[str, str]], wp_base_url: str) -> str:
-    if TEMPLATE.exists():
-        tpl = Template(TEMPLATE.read_text(encoding="utf-8"))
-        return tpl.render(title=title, lede=lede, headings=headings, sections=sections,
-                          offers=offers, wp_base_url=wp_base_url)
+def _render_offers(offers: List[Dict[str, str]]) -> str:
+    """A8の手動CSVから渡ってきたオファーをいい感じのカードにする"""
+    if not offers:
+        return ""
 
-    # fallback HTML
-    html = [f"<h2>{title}</h2>", f"<p>{lede}</p>"]
-    for h, s in zip(headings, sections):
-        html.append(f"<h3>{h}</h3><p>{s}</p>")
+    blocks: List[str] = []
+    blocks.append('<h2>おすすめサービス・商品</h2>')
 
-    if offers:
-        html.append("<h3>おすすめサービス・商品</h3><div>")
-        for o in offers:
-            html.append(f"""
-            <div style='border:1px solid #ddd;padding:10px;margin:10px 0;border-radius:8px;'>
-              <strong>{o.get('title') or o['name']}</strong><br>
-              <span style='font-size:90%;color:#666;'>{o.get('note','')}</span><br>
-              <a href='{o['url']}' rel='nofollow noopener' target='_blank'
-                 style='display:inline-block;margin-top:6px;padding:6px 12px;
-                 background:#ff7f50;color:white;border-radius:6px;text-decoration:none;'>
-                 ▶ 詳しくみる
-              </a>
-            </div>
-            """)
-        html.append("</div>")
+    for offer in offers:
+        name = offer.get("name") or "おすすめ案件"
+        url = offer.get("url") or "#"
+        note = offer.get("note") or ""
 
-    return "\n".join(html)
+        # XSS/文字化け防止でnameとnoteだけはescapeしておく
+        name_esc = html.escape(name)
+        note_esc = html.escape(note)
+
+        blocks.append(
+            f"""
+<div class="offer-box" style="border:1px solid #ddd;padding:1rem;margin:1rem 0;border-radius:0.5rem;">
+  <h3 style="margin-top:0;">{name_esc}</h3>
+  {"<p style='color:#666;margin:.4rem 0 .8rem 0;'>" + note_esc + "</p>" if note_esc else ""}
+  <p style="margin:0;">
+    <a href="{url}" rel="nofollow noopener" target="_blank" style="display:inline-block;background:#0073aa;color:#fff;padding:.5rem 1rem;border-radius:9999px;text-decoration:none;">
+      ▶ 詳しくみる
+    </a>
+  </p>
+</div>
+""".strip()
+        )
+
+    return "\n".join(blocks)
+
+
+def render_article(
+    title: str,
+    lede: str,
+    headings: List[str],
+    sections: List[str],
+    offers: List[Dict[str, str]],
+    site_url: str = "",
+) -> str:
+    """本文＋見出し＋A8のおすすめの順でHTMLを組み立てる"""
+
+    html_parts: List[str] = []
+
+    # タイトル・リード
+    html_parts.append(f"<h1>{html.escape(title)}</h1>")
+    if lede:
+        html_parts.append(f"<p>{html.escape(lede)}</p>")
+
+    # 本文セクション
+    for h, body in zip(headings, sections):
+        html_parts.append(f"<h2>{html.escape(h)}</h2>")
+        # body は Gemini が返したHTMLをそのまま載せる想定なのでエスケープしない
+        html_parts.append(body)
+
+    # A8おすすめ
+    html_parts.append(_render_offers(offers))
+
+    return "\n".join(html_parts)
