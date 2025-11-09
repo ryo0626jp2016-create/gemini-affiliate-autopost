@@ -1,42 +1,8 @@
 # scripts/render_post.py
-
 from __future__ import annotations
+
 from typing import List, Dict
 import html
-
-
-def _render_offers(offers: List[Dict[str, str]]) -> str:
-    """A8の手動CSVから渡ってきたオファーをいい感じのカードにする"""
-    if not offers:
-        return ""
-
-    blocks: List[str] = []
-    blocks.append('<h2>おすすめサービス・商品</h2>')
-
-    for offer in offers:
-        name = offer.get("name") or "おすすめ案件"
-        url = offer.get("url") or "#"
-        note = offer.get("note") or ""
-
-        # XSS/文字化け防止でnameとnoteだけはescapeしておく
-        name_esc = html.escape(name)
-        note_esc = html.escape(note)
-
-        blocks.append(
-            f"""
-<div class="offer-box" style="border:1px solid #ddd;padding:1rem;margin:1rem 0;border-radius:0.5rem;">
-  <h3 style="margin-top:0;">{name_esc}</h3>
-  {"<p style='color:#666;margin:.4rem 0 .8rem 0;'>" + note_esc + "</p>" if note_esc else ""}
-  <p style="margin:0;">
-    <a href="{url}" rel="nofollow noopener" target="_blank" style="display:inline-block;background:#0073aa;color:#fff;padding:.5rem 1rem;border-radius:9999px;text-decoration:none;">
-      ▶ 詳しくみる
-    </a>
-  </p>
-</div>
-""".strip()
-        )
-
-    return "\n".join(blocks)
 
 
 def render_article(
@@ -45,24 +11,41 @@ def render_article(
     headings: List[str],
     sections: List[str],
     offers: List[Dict[str, str]],
-    site_url: str = "",
+    wp_base_url2: str = "",
 ) -> str:
-    """本文＋見出し＋A8のおすすめの順でHTMLを組み立てる"""
+    parts: List[str] = []
 
-    html_parts: List[str] = []
+    # サムネ用に1枚入れておく（テーマが最初の画像を拾う前提）
+    hero_src = "https://placehold.jp/1200x630.png?text=" + html.escape(title)
+    parts.append(f'<figure class="post-hero"><img src="{hero_src}" alt="{html.escape(title)}"></figure>')
 
-    # タイトル・リード
-    html_parts.append(f"<h1>{html.escape(title)}</h1>")
+    parts.append(f"<h1>{html.escape(title)}</h1>")
+
     if lede:
-        html_parts.append(f"<p>{html.escape(lede)}</p>")
+        parts.append(f"<p>{html.escape(lede)}</p>")
 
-    # 本文セクション
     for h, body in zip(headings, sections):
-        html_parts.append(f"<h2>{html.escape(h)}</h2>")
-        # body は Gemini が返したHTMLをそのまま載せる想定なのでエスケープしない
-        html_parts.append(body)
+        parts.append(f"<h2>{html.escape(h)}</h2>")
+        # body は Gemini が返したHTMLをそのまま入れる
+        parts.append(body)
 
-    # A8おすすめ
-    html_parts.append(_render_offers(offers))
+    if offers:
+        parts.append("<h2>おすすめサービス・商品</h2>")
+        for off in offers:
+            name = off.get("name") or "おすすめサービス"
+            url = off.get("url") or "#"
+            note = off.get("note") or ""
 
-    return "\n".join(html_parts)
+            # クエリが消えないようにHTMLエスケープ
+            safe_url = html.escape(url, quote=True)
+
+            parts.append('<div class="offer-box">')
+            parts.append(f"<h3>{html.escape(name)}</h3>")
+            if note:
+                parts.append(f"<p>{html.escape(note)}</p>")
+            parts.append(
+                f'<p><a class="offer-btn" href="{safe_url}" target="_blank" rel="nofollow noopener">▶ 詳しくみる</a></p>'
+            )
+            parts.append("</div>")
+
+    return "\n".join(parts)
