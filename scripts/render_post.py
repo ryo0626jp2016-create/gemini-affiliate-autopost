@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List, Dict
 import html
-
+import urllib.parse
 
 def render_article(
     title: str,
@@ -15,8 +15,14 @@ def render_article(
 ) -> str:
     parts: List[str] = []
 
-    # サムネ用に1枚入れておく（テーマが最初の画像を拾う前提）
-    hero_src = "https://placehold.jp/1200x630.png?text=" + html.escape(title)
+    # ★改善点: 画像を「文字画像」から「AI生成イラスト」に変更
+    # Pollinations AI を使用 (登録不要・無料)
+    # プロンプトを英語風に変換してURLに埋め込む
+    safe_title = urllib.parse.quote(title)
+    # 日本語プロンプトでも動きますが、念のため 'illustration', 'blog header' などの指示を追加
+    image_prompt = f"illustration of {safe_title}, bright style, high quality"
+    hero_src = f"https://image.pollinations.ai/prompt/{image_prompt}?width=1200&height=630&nologo=true"
+
     parts.append(f'<figure class="post-hero"><img src="{hero_src}" alt="{html.escape(title)}"></figure>')
 
     parts.append(f"<h1>{html.escape(title)}</h1>")
@@ -26,7 +32,7 @@ def render_article(
 
     for h, body in zip(headings, sections):
         parts.append(f"<h2>{html.escape(h)}</h2>")
-        # body は Gemini が返したHTMLをそのまま入れる
+        # body は Gemini が返したHTML(表やリスト含む)をそのまま入れる
         parts.append(body)
 
     if offers:
@@ -43,8 +49,10 @@ def render_article(
             parts.append(f"<h3>{html.escape(name)}</h3>")
             if note:
                 parts.append(f"<p>{html.escape(note)}</p>")
+            
+            # ボタンのデザイン用クラスはCSSで装飾推奨
             parts.append(
-                f'<p><a class="offer-btn" href="{safe_url}" target="_blank" rel="nofollow noopener">▶ 詳しくみる</a></p>'
+                f'<p><a class="offer-btn" href="{safe_url}" target="_blank" rel="nofollow noopener">▶ 公式サイトで詳しく見る</a></p>'
             )
             parts.append("</div>")
 
