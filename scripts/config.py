@@ -10,9 +10,8 @@ class Settings:
 
     # Gemini
     gemini_api_key: str = os.getenv("GEMINI_API_KEY") or ""
-    # モデル名の正規化（空/全角/先頭に 'models/' が付いてもOKに）
-    # 修正: 存在しない 2.5 系から、安定版の 1.5-flash に変更
-    _raw = (os.getenv("GEMINI_MODEL") or "gemini-1.5-flash").strip()
+    # 修正: "gemini-1.5-flash" でダメだったため、"gemini-1.5-flash-latest" に変更
+    _raw = (os.getenv("GEMINI_MODEL") or "gemini-1.5-flash-latest").strip()
     
     if _raw.startswith("models/"):
         _raw = _raw.split("/", 1)[1]
